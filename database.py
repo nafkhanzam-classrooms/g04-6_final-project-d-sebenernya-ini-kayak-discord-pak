@@ -57,6 +57,37 @@ def verify_user(username, password):
     
     return user is not None #mengembalikan True jika ketemu, False jika tidak
 
+def get_room_history(room_name, limit=20):
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    
+    cursor.execute('''
+        SELECT type, sender, message, timestamp FROM chat_history
+        WHERE (type = 'MESSAGE' AND room = ?) OR type = 'BROADCAST'
+        ORDER BY id DESC LIMIT ?
+    ''', (room_name, limit))
+    
+    rows = cursor.fetchall()
+    conn.close()
+    
+    return [dict(row) for row in reversed(rows)]
+
+def get_dm_history(user1, user2, limit=20):
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    
+    cursor.execute('''
+        SELECT type, sender, message, timestamp FROM chat_history
+        WHERE type = 'DM' AND 
+        ((sender = ? AND target = ?) OR (sender = ? AND target = ?))
+        ORDER BY id DESC LIMIT ?
+    ''', (user1, user2, user2, user1, limit))
+    
+    rows = cursor.fetchall()
+    conn.close()
+    
+    return [dict(row) for row in reversed(rows)]
+
 def log_message(msg_type, sender, message, room=None, target=None, timestamp=None):
     if not timestamp:
         timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")

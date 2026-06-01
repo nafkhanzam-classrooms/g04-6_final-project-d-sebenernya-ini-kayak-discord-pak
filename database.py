@@ -4,16 +4,11 @@ from datetime import datetime
 DB_NAME = "fake_dc.db"
 
 def get_db_connection():
-    """
-    Membuat koneksi ke database.
-    check_same_thread=False mengizinkan SQLite digunakan di aplikasi multithread.
-    """
     conn = sqlite3.connect(DB_NAME, check_same_thread=False)
-    conn.row_factory = sqlite3.Row # Agar hasil query bisa diakses seperti dictionary
+    conn.row_factory = sqlite3.Row
     return conn
 
 def init_db():
-    """Membuat tabel jika belum ada."""
     conn = get_db_connection()
     cursor = conn.cursor()
     
@@ -29,12 +24,40 @@ def init_db():
         )
     ''')
     
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS users (
+            username TEXT PRIMARY KEY,
+            password TEXT NOT NULL
+        )
+    ''')
+
     conn.commit()
     conn.close()
     print("[DB] Database & Tabel berhasil diinisialisasi.")
 
+def register_user(username, password):
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    try:
+        cursor.execute('INSERT INTO users (username, password) VALUES (?, ?)', (username, password))
+        conn.commit()
+        return True
+    except sqlite3.IntegrityError:
+        return False
+    finally:
+        conn.close()
+
+def verify_user(username, password):
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    
+    cursor.execute('SELECT * FROM users WHERE username = ? AND password = ?', (username, password))
+    user = cursor.fetchone()
+    conn.close()
+    
+    return user is not None #mengembalikan True jika ketemu, False jika tidak
+
 def log_message(msg_type, sender, message, room=None, target=None, timestamp=None):
-    """Fungsi universal untuk mencatat segala jenis pesan ke database."""
     if not timestamp:
         timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         

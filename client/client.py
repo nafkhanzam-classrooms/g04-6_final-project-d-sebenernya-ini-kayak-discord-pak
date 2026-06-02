@@ -35,24 +35,58 @@ def start_client():
     sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     sock.connect((HOST, PORT))
 
-    username = input("Username: ")
+    # Menu Login/Register
+    while True:
+        print("\n[AUTH MENU]")
+        print("1. Register")
+        print("2. Login")
+        choice = input("Pilih (1/2): ").strip()
 
-    sock.send(json.dumps({
-        "type": "LOGIN",
-        "sender": username
+        if choice == "1":
+            # Register
+            username = input("Username: ")
+            password = input("Password: ")
 
-    }).encode())
+            sock.send(json.dumps({
+                "type": "REGISTER",
+                "username": username,
+                "password": password
+            }).encode())
 
-    data = sock.recv(4096)
-    msg = json.loads(data.decode())
+            data = sock.recv(4096)
+            msg = json.loads(data.decode())
+            print(f"[SERVER] {msg['message']}")
 
-    print(f"[SERVER] {msg['message']}")
+            if msg["type"] == "REGISTER_SUCCESS":
+                continue  # Kembali ke menu
+            else:
+                continue  # Kembali ke menu
 
-    if msg["type"] != "LOGIN":
-        sock.close()
-        return
-    
-    print(f"[SYSTEM] {msg.get('welcome')}")
+        elif choice == "2":
+            # Login
+            username = input("Username: ")
+            password = input("Password: ")
+
+            sock.send(json.dumps({
+                "type": "LOGIN",
+                "sender": username,
+                "password": password
+            }).encode())
+
+            data = sock.recv(4096)
+            msg = json.loads(data.decode())
+
+            print(f"[SERVER] {msg['message']}")
+
+            if msg["type"] != "LOGIN":
+                print("[ERROR] Login failed, disconnecting...")
+                sock.close()
+                return
+            
+            print(f"[SYSTEM] {msg.get('welcome')}")
+            break
+        else:
+            print("Pilihan tidak valid")
 
     thread = threading.Thread(target=receive, args=(sock,), daemon=True)
     thread.start()

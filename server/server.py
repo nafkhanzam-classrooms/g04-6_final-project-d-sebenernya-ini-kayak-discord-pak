@@ -33,6 +33,18 @@ def send_system(username, message):
 def handle_login(data, conn):
 
     username = data["sender"]
+    password = data.get("password")
+
+    if not database.verify_user(username, password):
+        send(
+            conn,
+            {
+                "type": "LOGIN_FAILED",
+                "message": "Username or password incorrect",
+            },
+        )
+        conn.close()
+        return None
 
     if username in clients:
         send(conn, {

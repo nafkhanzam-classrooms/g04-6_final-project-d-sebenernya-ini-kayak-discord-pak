@@ -48,7 +48,7 @@ def start_client():
     sock.send(json.dumps({
         "type": "LOGIN",
         "sender": username,
-        # "password": password
+        "password": password
     }).encode())
 
     data = sock.recv(4096)

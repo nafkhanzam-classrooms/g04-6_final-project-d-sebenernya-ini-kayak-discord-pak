@@ -2,9 +2,12 @@ import socket
 import threading
 import json
 from datetime import datetime
+import database
 
 HOST = "0.0.0.0"
 PORT = 5000
+
+database.init_db()
 
 clients = {}
 rooms = {
@@ -77,6 +80,8 @@ def handle_message(data):
 
     print(f"[MSG] [ {room} | {payload['timestamp']}] {sender}: {msg}")
 
+    log_message(msg_type="MESSAGE", sender=sender, message=msg, room=room)
+
     for user in rooms.get(room, []):
         send(clients[user]["sock"], payload)
 
@@ -138,6 +143,8 @@ def handle_dm(data, username): #Private Message/Direct Message
 
     print(f"[DM] {username} to {target}")
 
+    log_message(msg_type="MESSAGE", sender=sender, message=msg, room=room)
+
 
 def handle_broadcast(data, username):
 
@@ -162,6 +169,8 @@ def handle_broadcast(data, username):
             print(f"[BC] {username}: {message}")
         except:
             del clients[user]
+
+    log_message(msg_type="MESSAGE", sender=sender, message=msg, room=room)
 
     
 

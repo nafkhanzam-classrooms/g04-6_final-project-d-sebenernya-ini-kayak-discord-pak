@@ -2,7 +2,13 @@ import socket
 import threading
 import json
 from datetime import datetime
+<<<<<<< Updated upstream
 import database
+=======
+from database import init_db, log_message
+
+init_db()
+>>>>>>> Stashed changes
 
 HOST = "0.0.0.0"
 PORT = 5000
@@ -96,7 +102,7 @@ def handle_login(data, conn):
         "welcome": f"Welcome {username}, Type /help for commands"
     })
 
-    print(f"[LOGIN] {username}")
+    log_message("LOGIN", username, "User logged in")
     return username
 
 
@@ -118,8 +124,12 @@ def handle_message(data):
 
     print(f"[MSG] [ {room} | {payload['timestamp']}] {sender}: {msg}")
 
+<<<<<<< Updated upstream
     # Log pesan ke database
     database.log_message("MESSAGE", sender, msg, room=room, timestamp=payload['timestamp'])
+=======
+    log_message(msg_type="MESSAGE", sender=sender, message=msg, room=room)  #ami added this, log message to database
+>>>>>>> Stashed changes
 
     for user in rooms.get(room, []):
         send(clients[user]["sock"], payload)
@@ -185,6 +195,8 @@ def handle_dm(data, username): #Private Message/Direct Message
 
     send_system(username, f"DM sent to {target}")
 
+    log_message(msg_type="DM", sender=username, message=message, target=target, timestamp=timestamp) #ami added this, log DM message to database
+
     print(f"[DM] {username} to {target}")
 
 
@@ -208,6 +220,8 @@ def handle_broadcast(data, username):
         "message": message,
         "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     }
+
+    log_message(msg_type="BROADCAST", sender=username, message=message, timestamp=timestamp) #ami added this, log broadcast message to database
 
     for user, info in list(clients.items()):
         try:

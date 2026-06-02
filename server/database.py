@@ -3,6 +3,7 @@ from datetime import datetime
 
 DB_NAME = "fake_dc.db"
 
+
 def get_db_connection():
     """
     Membuat koneksi ke database.

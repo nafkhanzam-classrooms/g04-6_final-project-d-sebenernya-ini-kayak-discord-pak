@@ -10,7 +10,7 @@ def get_db_connection():
     check_same_thread=False mengizinkan SQLite digunakan di aplikasi multithread.
     """
     conn = sqlite3.connect(DB_NAME, check_same_thread=False)
-    conn.row_factory = sqlite3.Row # Agar hasil query bisa diakses seperti dictionary
+    conn.row_factory = sqlite3.Row    # Agar hasil query bisa diakses seperti dictionary
     return conn
 
 def init_db():
@@ -29,10 +29,36 @@ def init_db():
             timestamp TEXT NOT NULL
         )
     ''')
-    
+    # simpan akun
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS users (
+            username TEXT PRIMARY KEY,
+            password TEXT NOT NULL
+        )
+    ''')
+
+    default_users = [
+        ('ami', '123'),
+        ('andra', '123'),
+        ('ara', '555')
+    ]
+
+    cursor.executemany('INSERT OR IGNORE INTO users (username, password) VALUES (?, ?)', default_users)
+
     conn.commit()
     conn.close()
     print("[DB] Database & Tabel berhasil diinisialisasi.")
+
+def verify_user(username, password):
+    """Fungsi untuk memverifikasi akun (Mengembalikan True jika cocok, False jika tidak)."""
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    
+    cursor.execute('SELECT * FROM users WHERE username = ? AND password = ?', (username, password))
+    user = cursor.fetchone()
+    conn.close()
+    
+    return user is not None
 
 def log_message(msg_type, sender, message, room=None, target=None, timestamp=None):
     """Fungsi universal untuk mencatat segala jenis pesan ke database."""
@@ -44,7 +70,7 @@ def log_message(msg_type, sender, message, room=None, target=None, timestamp=Non
     
     try:
         cursor.execute('''
-            INSERT INTO chat_history (type, sender, room, target, message, timestamp)
+            INSERT INTO messages (type, sender, room, target, message, timestamp)
             VALUES (?, ?, ?, ?, ?, ?)
         ''', (msg_type, sender, room, target, message, timestamp))
         conn.commit()

@@ -22,8 +22,15 @@ def receive(sock):
                 print(f'\n[{msg["timestamp"]}] {msg["sender"]}: {msg["message"]}')
                 print("> ", end="", flush=True)
 
-            if msg["type"] == "SYSTEM":
+            elif msg["type"] == "SYSTEM":
                 print(f"\n[SYSTEM] {msg['message']}")
+                print("> ", end="", flush=True)
+
+            elif msg["type"] == "HISTORY_RESPONSE":
+                print("\n--- CHAT HISTORY ---")
+                for chat in msg["chats"]:
+                    print(f"[{chat['timestamp']}] {chat['sender']}: {chat['message']}")
+                print("--------------------")
                 print("> ", end="", flush=True)
 
         except:
@@ -36,11 +43,12 @@ def start_client():
     sock.connect((HOST, PORT))
 
     username = input("Username: ")
+    password = input("Password: ")
 
     sock.send(json.dumps({
         "type": "LOGIN",
-        "sender": username
-
+        "sender": username,
+        # "password": password
     }).encode())
 
     data = sock.recv(4096)
@@ -68,6 +76,7 @@ def start_client():
             /users                  - List online users in current room
             /rooms                  - List available rooms
             /create <room>          - Create a new room
+            /history <number>       - Show last <number> messages in current room
             /join <room>            - Join an existing room
             /dm <user> <message>    - Sends a private/Direct message
             /bc <message>           - Sends a message to all rooms
@@ -126,6 +135,19 @@ def start_client():
                 "sender": username,
                 "room": room
             }).encode())
+            continue
+
+        if msg.startswith("/history "):
+            try:
+                limit = int(msg.split(" ", 1)[1].strip())
+                
+                sock.send(json.dumps({
+                    "type": "HISTORY",
+                    "sender": username,
+                    "limit": limit
+                }).encode())
+            except ValueError:
+                print("[SYSTEM] Gagal! Format harus angka. Contoh: /history 5")
             continue
 
         if msg.startswith("/join "):

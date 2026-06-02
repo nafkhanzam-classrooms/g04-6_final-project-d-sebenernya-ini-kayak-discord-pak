@@ -80,7 +80,7 @@ def handle_message(data):
 
     print(f"[MSG] [ {room} | {payload['timestamp']}] {sender}: {msg}")
 
-    log_message(msg_type="MESSAGE", sender=sender, message=msg, room=room)
+    database.log_message(msg_type="public", sender=sender, message=msg, room=room)
 
     for user in rooms.get(room, []):
         send(clients[user]["sock"], payload)
@@ -143,7 +143,7 @@ def handle_dm(data, username): #Private Message/Direct Message
 
     print(f"[DM] {username} to {target}")
 
-    log_message(msg_type="MESSAGE", sender=sender, message=msg, room=room)
+    database.log_message(msg_type="private", sender=username, message=message, target=target, timestamp=timestamp_now)
 
 
 def handle_broadcast(data, username):
@@ -170,7 +170,7 @@ def handle_broadcast(data, username):
         except:
             del clients[user]
 
-    log_message(msg_type="MESSAGE", sender=sender, message=msg, room=room)
+    database.log_message(msg_type="broadcast", sender=username, message=message, room="ALL", timestamp=timestamp_now)
 
     
 
@@ -208,6 +208,43 @@ def handle_join_room(data, username):
 
     print(f"[ROOM] {username}: Moved from {old_room} room to {new_room} room")
 
+def handle_history(data, username):
+    limit = data["limit"]
+    room = clients[username]["room"]
+
+    conn = database.get_db_connection()
+    cursor = conn.cursor()
+    
+    try:
+        cursor.execute('''
+            SELECT sender, message, timestamp FROM (
+                SELECT sender, message, timestamp, id FROM messages 
+                WHERE room = ? AND type = 'public'
+                ORDER BY id DESC LIMIT ?
+            ) ORDER BY id ASC
+        ''', (room, limit))
+        
+        rows = cursor.fetchall()
+        
+        chats = []
+        for row in rows:
+            chats.append({
+                "sender": row["sender"],
+                "message": row["message"],
+                "timestamp": row["timestamp"]
+            })
+            
+        send(clients[username]["sock"], {
+            "type": "HISTORY_RESPONSE",
+            "chats": chats
+        })
+        print(f"[HISTORY] Sent {len(chats)} messages to {username} in {room}")
+        
+    except Exception as e:
+        print(f"[SERVER ERROR] Gagal mengambil history: {e}")
+        send_system(username, "Gagal memuat history chat.")
+    finally:
+        conn.close()
 
 def handle_client(conn, addr):
     print(f"[CONNECTED] {addr}")
@@ -257,6 +294,10 @@ def handle_client(conn, addr):
 
             elif msg["type"] == "BC":
                 handle_broadcast(msg, username)
+
+            elif msg["type"] == "HISTORY":
+                if username:
+                    handle_history(msg, username)
 
             elif msg["type"] == "LOGOUT":
                 handle_logout(username)

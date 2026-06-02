@@ -2,6 +2,7 @@ import socket
 import threading
 import json
 from datetime import datetime
+import database
 
 HOST = "0.0.0.0"
 PORT = 5000
@@ -10,6 +11,9 @@ clients = {}
 rooms = {
     "general": set(),
 }
+
+# Inisialisasi database
+database.init_db()
 
 def send(sock, data):
 
@@ -27,16 +31,53 @@ def send_system(username, message):
     })
 
 
+def handle_register(data, conn):
+    username = data["username"]
+    password = data.get("password", "")
+
+    if not username or not password:
+        send(conn, {
+            "type": "REGISTER_FAILED",
+            "message": "Username and password required"
+        })
+        return False
+
+    # Register ke database
+    if database.register_user(username, password):
+        send(conn, {
+            "type": "REGISTER_SUCCESS",
+            "message": "Registration successful, please login"
+        })
+        print(f"[REGISTER] {username} registered")
+        return True
+    else:
+        send(conn, {
+            "type": "REGISTER_FAILED",
+            "message": "Username already exists"
+        })
+        print(f"[REGISTER FAILED] {username} already exists")
+        return False
+
+
 def handle_login(data, conn):
 
     username = data["sender"]
+    password = data.get("password", "")
+
+    # Verifikasi user dari database
+    if not database.verify_user(username, password):
+        send(conn, {
+            "type": "LOGIN_FAILED",
+            "message": "Invalid username or password"
+        })
+        conn.close()
+        return None
 
     if username in clients:
         send(conn, {
             "type": "LOGIN_FAILED",
-            "message": "Username already taken"
+            "message": "Username already online"
         })
-
         conn.close()
         return None
     
@@ -76,6 +117,9 @@ def handle_message(data):
     }
 
     print(f"[MSG] [ {room} | {payload['timestamp']}] {sender}: {msg}")
+
+    # Log pesan ke database
+    database.log_message("MESSAGE", sender, msg, room=room, timestamp=payload['timestamp'])
 
     for user in rooms.get(room, []):
         send(clients[user]["sock"], payload)
@@ -127,12 +171,17 @@ def handle_dm(data, username): #Private Message/Direct Message
         send_system(username, "User not found")
         return
     
+    timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    
     send(clients[target]["sock"], {
         "type": "MESSAGE",
         "sender": f"[DM] {username}",
         "message": message,
-        "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        "timestamp": timestamp
     })
+
+    # Log DM ke database
+    database.log_message("DM", username, message, target=target, timestamp=timestamp)
 
     send_system(username, f"DM sent to {target}")
 
@@ -148,6 +197,10 @@ def handle_broadcast(data, username):
         return
     
     message = msg[1]
+    timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    
+    # Log broadcast ke database
+    database.log_message("BROADCAST", username, message, timestamp=timestamp)
 
     payload = {
         "type": "MESSAGE",
@@ -220,7 +273,10 @@ def handle_client(conn, addr):
                 print(f"[BAD JSON] {addr}")
                 continue    
 
-            if msg["type"] == "LOGIN":
+            if msg["type"] == "REGISTER":
+                handle_register(msg, conn)
+
+            elif msg["type"] == "LOGIN":
                 username = handle_login(msg, conn)
 
                 if username == None:

@@ -14,6 +14,8 @@ rooms = {
     "general": set(),
 }
 
+lock = threading.Lock()
+
 def send(sock, data):
 
     try:
@@ -24,7 +26,13 @@ def send(sock, data):
 
 def send_system(username, message):
 
-    send(clients[username]["sock"], {
+    with lock:
+        client = clients.get(username)
+
+    if not client:
+        return
+
+    send(clients["sock"], {
         "type": "SYSTEM",
         "message": message
     })
@@ -57,12 +65,13 @@ def handle_login(data, conn):
     
     rooms.setdefault("general", set())
     
-    clients[username] = {
-        "sock": conn,
-        "room": "general"
-    }
+    with lock: 
+        clients[username] = {
+            "sock": conn,
+            "room": "general"
+        }
 
-    rooms["general"].add(username)
+        rooms["general"].add(username)
 
     send(conn, {
         "type": "LOGIN",
@@ -79,7 +88,9 @@ def handle_message(data):
     sender = data["sender"]
     msg = data["message"]
 
-    room = clients[sender]["room"]
+    with lock:
+        room = clients[sender]["room"]
+        targets = list(rooms.get(room, set()))
 
     payload = {
         "type": "MESSAGE",
@@ -94,7 +105,7 @@ def handle_message(data):
 
     database.log_message(msg_type="public", sender=sender, message=msg, room=room)
 
-    for user in rooms.get(room, []):
+    for user in targets:
         send(clients[user]["sock"], payload)
 
 
@@ -103,12 +114,18 @@ def handle_logout(username):
     if username not in clients:
         return
 
-    room = clients[username]["room"]
+    with lock:
+        room = clients[username]["room"]
 
-    if room in rooms:
-        rooms[room].discard(username)
+        if room in rooms:
+            rooms[room].discard(username)
 
-    del clients[username]
+        del clients[username]
+
+    handle_broadcast_room(room, {
+        "type": "SYSTEM",
+        "message": f"{username} left the room"
+    })
 
     print(f"[LOGOUT] {username}")
 
@@ -155,7 +172,7 @@ def handle_dm(data, username): #Private Message/Direct Message
 
     print(f"[DM] {username} to {target}")
 
-    database.log_message(msg_type="private", sender=username, message=message, target=target, timestamp=timestamp_now)
+    database.log_message(msg_type="private", sender=username, message=message, target=target)
 
 
 def handle_broadcast(data, username):
@@ -175,14 +192,19 @@ def handle_broadcast(data, username):
         "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     }
 
-    for user, info in list(clients.items()):
+    with lock:
+        users = list(clients.items())
+
+    for user, info in users:
         try:
             send(info["sock"], payload)
-            print(f"[BC] {username}: {message}")
         except:
-            del clients[user]
+            with lock:
+                clients.pop(user, None)
 
-    database.log_message(msg_type="broadcast", sender=username, message=message, room="ALL", timestamp=timestamp_now)
+    print(f"[BC] {username}: {message}")
+    
+    database.log_message(msg_type="broadcast", sender=username, message=message, room="ALL")
 
     
 
@@ -201,20 +223,42 @@ def handle_create_room(data, username):
     print(f"[ROOM CREATED] {room}")
 
 
+def handle_broadcast_room(room, payload):
+    with lock:
+        targets = list(rooms.get(room, set()))
+
+    for user in targets:
+        try:
+            send(clients[user]["sock"], payload)
+        except:
+            pass 
+
+
 def handle_join_room(data, username):
 
     new_room = data["room"]
     old_room = clients[username]["room"]
 
-    if old_room in rooms:
-        rooms[old_room].discard(username)
-
     if new_room not in rooms:
         send_system(username, "Room not found, use /rooms to see list of rooms")
         return
+    
+    with lock:
+        if old_room in rooms:
+            rooms[old_room].discard(username)
 
-    rooms[new_room].add(username)
-    clients[username]["room"] = new_room
+        rooms[new_room].add(username)
+        clients[username]["room"] = new_room
+
+    handle_broadcast_room(old_room, {
+        "type": "SYSTEM",
+        "message": f"{username} left the room"
+    })
+
+    handle_broadcast_room(new_room, {
+        "type": "SYSTEM",
+        "message": f"{username} joined the room"
+    })
 
     send_system(username, f"Joined {new_room} room")
 
@@ -318,14 +362,6 @@ def handle_client(conn, addr):
         except Exception as e:
             print(f"[ERROR] {addr} -> {e}")
             break
-
-    if username and username in clients:
-        room = clients[username]["room"]
-
-        if room in rooms:
-            rooms[room].discard(username)
-
-        del clients[username]
 
     conn.close()
     print(f"[DISCONNECTED] {addr}")

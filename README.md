@@ -40,8 +40,6 @@ Aplikasi ini menerapkan arsitektur client-server sehingga banyak pengguna dapat 
 
 ## Materi yang Diterapkan
 
-## Materi yang Diterapkan
-
 | Materi    | Implementasi |
 | ---       | --- |
 | Konsep client-server | Server menangani koneksi dan komunikasi dari banyak client |
@@ -74,7 +72,7 @@ SQLite database `fake_dc.db` akan dibuat secara otomatis saat server pertama kal
 
 ## Arsitektur
 
-drop diagram
+<img width="601" height="181" alt="letschatarchi" src="https://github.com/user-attachments/assets/01c35997-bc0a-41d1-a0d0-1f5034d7d4e0" />
 
 ## Akun Default
 
@@ -183,13 +181,14 @@ Command ini akan menampilkan 10 pesan terbaru dari room yang sedang ditempati pe
 ## Screenshots
 
 ### Login
-
+<img width="313" height="173" alt="Screenshot 2026-06-05 164352" src="https://github.com/user-attachments/assets/0901eacf-1003-42fa-8850-e79930b9ab5d" />
 
 ### Create Room
-
+<img width="267" height="145" alt="Screenshot 2026-06-05 164445" src="https://github.com/user-attachments/assets/1ad4dfda-7c84-4157-8d44-abad8ed94378" />
 
 ### Private Message
-
+<img width="819" height="333" alt="image" src="https://github.com/user-attachments/assets/6cd6ad29-b00b-485b-b236-2315518be9c3" />
 
 ### Chat History
+<img width="508" height="370" alt="image" src="https://github.com/user-attachments/assets/6dd2a098-dc4a-4b39-a076-37792c6bf958" />
 

@@ -32,7 +32,7 @@ def send_system(username, message):
     if not client:
         return
 
-    send(clients["sock"], {
+    send(client["sock"], {
         "type": "SYSTEM",
         "message": message
     })
@@ -115,7 +115,11 @@ def handle_logout(username):
         return
 
     with lock:
-        room = clients[username]["room"]
+        client = clients.get(username)
+        if not client:
+            return
+        
+        room = client["room"]
 
         if room in rooms:
             rooms[room].discard(username)
@@ -203,7 +207,7 @@ def handle_broadcast(data, username):
                 clients.pop(user, None)
 
     print(f"[BC] {username}: {message}")
-    
+
     database.log_message(msg_type="broadcast", sender=username, message=message, room="ALL")
 
     

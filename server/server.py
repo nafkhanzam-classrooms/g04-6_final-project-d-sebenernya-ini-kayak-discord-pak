@@ -253,10 +253,40 @@ def handle_history(data, username):
         print(f"[HISTORY] Sent {len(chats)} messages to {username} in {room}")
         
     except Exception as e:
-        print(f"[SERVER ERROR] Gagal mengambil history: {e}")
-        send_system(username, "Gagal memuat history chat.")
+        print(f"[SERVER ERROR] Failed to fetch history: {e}")
+        send_system(username, "Failed to load chat history.")
     finally:
         conn.close()
+
+def handle_file(data):
+    sender = data["sender"]
+    filename = data["filename"]
+    file_data = data["file_data"]
+    timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    
+    if sender in clients:
+        room = clients[sender]["room"]
+    else:
+        room = "general"
+
+    payload = {
+        "type": "FILE",
+        "sender": sender,
+        "filename": filename,
+        "file_data": file_data,
+        "room": room,
+        "timestamp": timestamp,
+    }
+
+    print(f"[FILE] [ {room} | {timestamp}] {sender} sends {filename}")
+
+    db_msg = f"[Sending File] {filename}"
+    database.log_message(
+        msg_type="public", sender=sender, message=db_msg, room=room
+    )
+
+    for user in rooms.get(room, []):
+        send(clients[user]["sock"], payload)
 
 def handle_client(conn, addr):
     print(f"[CONNECTED] {addr}")
@@ -310,6 +340,10 @@ def handle_client(conn, addr):
             elif msg["type"] == "HISTORY":
                 if username:
                     handle_history(msg, username)
+
+            elif msg["type"] == "FILE":
+                    if username:
+                        handle_file(msg)
 
             elif msg["type"] == "LOGOUT":
                 handle_logout(username)

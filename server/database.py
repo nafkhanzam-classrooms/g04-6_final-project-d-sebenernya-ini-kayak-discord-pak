@@ -5,16 +5,11 @@ DB_NAME = "fake_dc.db"
 
 
 def get_db_connection():
-    """
-    Membuat koneksi ke database.
-    check_same_thread=False mengizinkan SQLite digunakan di aplikasi multithread.
-    """
     conn = sqlite3.connect(DB_NAME, check_same_thread=False)
-    conn.row_factory = sqlite3.Row    # Agar hasil query bisa diakses seperti dictionary
+    conn.row_factory = sqlite3.Row
     return conn
 
 def init_db():
-    """Membuat tabel jika belum ada."""
     conn = get_db_connection()
     cursor = conn.cursor()
     
@@ -47,10 +42,9 @@ def init_db():
 
     conn.commit()
     conn.close()
-    print("[DB] Database & Tabel berhasil diinisialisasi.")
+    print("[DB] Database initialized.")
 
 def verify_user(username, password):
-    """Fungsi untuk memverifikasi akun (Mengembalikan True jika cocok, False jika tidak)."""
     conn = get_db_connection()
     cursor = conn.cursor()
     
@@ -61,7 +55,6 @@ def verify_user(username, password):
     return user is not None
 
 def log_message(msg_type, sender, message, room=None, target=None, timestamp=None):
-    """Fungsi universal untuk mencatat segala jenis pesan ke database."""
     if not timestamp:
         timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         
@@ -75,6 +68,6 @@ def log_message(msg_type, sender, message, room=None, target=None, timestamp=Non
         ''', (msg_type, sender, room, target, message, timestamp))
         conn.commit()
     except Exception as e:
-        print(f"[DB ERROR] Gagal menyimpan log: {e}")
+        print(f"[DB ERROR] Failed to log message: {e}")
     finally:
         conn.close()

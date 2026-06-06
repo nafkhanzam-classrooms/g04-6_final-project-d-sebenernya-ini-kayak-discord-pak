@@ -1,5 +1,7 @@
 import socket
 import threading
+import os
+import base64
 import json
 
 HOST = "127.0.0.1"
@@ -31,6 +33,25 @@ def receive(sock):
                 for chat in msg["chats"]:
                     print(f"[{chat['timestamp']}] {chat['sender']}: {chat['message']}")
                 print("--------------------")
+                print("> ", end="", flush=True)
+
+            elif msg["type"] == "FILE":
+                filename = msg["filename"]
+                file_data_b64 = msg["file_data"]
+                sender = msg["sender"]
+
+                if not os.path.exists("downloads"):
+                    os.makedirs("downloads")
+
+                filepath = os.path.join("downloads", filename)
+
+                with open(filepath, "wb") as f:
+                    f.write(base64.b64decode(file_data_b64.encode()))
+
+                print(
+                    f"\n[{msg['timestamp']}] [FILE] {sender} sending: '{filename}'"
+                )
+                print(f"[SYSTEM] File received: {filepath}")
                 print("> ", end="", flush=True)
 
         except:
@@ -79,6 +100,7 @@ def start_client():
             /history <number>       - Show last <number> messages in current room
             /join <room>            - Join an existing room
             /dm <user> <message>    - Sends a private/Direct message
+            /file <file_path>       - Sends a file to the current room
             /bc <message>           - Sends a message to all rooms
             /exit or /logout        - Quit the program
                     """)
@@ -147,7 +169,36 @@ def start_client():
                     "limit": limit
                 }).encode())
             except ValueError:
-                print("[SYSTEM] Gagal! Format harus angka. Contoh: /history 5")
+                print("[SYSTEM] Failed!")
+            continue
+
+        if msg.startswith("/file "):
+            filepath = msg.split(" ", 1)[1].strip()
+
+            if not os.path.exists(filepath):
+                print(f"[SYSTEM] File '{filepath}' Not Found!")
+                continue
+
+            try:
+                filename = os.path.basename(filepath)
+                with open(filepath, "rb") as f:
+                    file_data_b64 = base64.b64encode(f.read()).decode()
+
+                payload = {
+                    "type": "FILE",
+                    "sender": username,
+                    "filename": filename,
+                    "file_data": file_data_b64,
+                    "room": "",
+                    "timestamp": "",
+                }
+
+                packet = json.dumps(payload) + "\n"
+                sock.sendall(packet.encode())
+
+                print(f"[SYSTEM] File '{filename}' Sent.")
+            except Exception as e:
+                print(f"[SYSTEM] Failed to read/send file: {e}")
             continue
 
         if msg.startswith("/join "):

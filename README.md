@@ -132,6 +132,7 @@ Login menggunakan salah satu akun pada [Akun Default](#akun-default).
 | /create <room>        | Membuat room baru                                     |  
 | /join <room>          | Bergabung ke room tertentu                            |
 | /history <jumlah>     | Menampilkan sejumlah pesan terakhir dari room aktif   |
+| /file                 | Mengirim File                                         |
 | /dm <user> <message>  | Mengirim private message                              |
 | /bc <message>         | Mengirim broadcast message ke seluruh pengguna online |
 | /logout               | Keluar dari aplikasi                                  |
@@ -178,6 +179,16 @@ Contoh:
 
 Command ini akan menampilkan 10 pesan terbaru dari room yang sedang ditempati pengguna.
 
+### Bertukar file
+
+Gunakan:
+```
+/file <file_path>
+```
+Contoh:
+```
+/file ../README.md
+```
 ## Screenshots
 
 ### Login
@@ -192,3 +203,6 @@ Command ini akan menampilkan 10 pesan terbaru dari room yang sedang ditempati pe
 ### Chat History
 <img width="508" height="370" alt="image" src="https://github.com/user-attachments/assets/6dd2a098-dc4a-4b39-a076-37792c6bf958" />
 
+### File Transfer
+<img width="1463" height="288" alt="image" src="https://github.com/user-attachments/assets/832303fd-354f-4472-9e97-4b30814211b3" />
+<img width="206" height="107" alt="image" src="https://github.com/user-attachments/assets/05a01149-38a8-41ee-9f8a-dc4876afcb83" />

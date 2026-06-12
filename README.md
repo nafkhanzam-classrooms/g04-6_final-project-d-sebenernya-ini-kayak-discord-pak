@@ -141,7 +141,7 @@ File yang dihasilkan:
 - server.key (private key)
 - server.crt (certificate)
 
-Letakkan file ini di root project, karena server akan memanggil:
+Letakkan file ini di `/server`, karena server akan memanggil:
 ```
 context.load_cert_chain(certfile="server.crt", keyfile="server.key")
 ```

@@ -13,7 +13,19 @@
 ```
 otw
 ```
+## Daftar Isi
 
+- [Deskripsi Singkat](#deskripsi-singkat)
+- [Fitur-Fitur](#fitur-fitur)
+- [Materi yang Diterapkan](#materi-yang-diterapkan)
+- [Struktur Project](#struktur-project)
+- [Arsitektur](#arsitektur)
+- [Enskripsi TLS](#enskripsi-tls)
+- [Akun Default](#akun-default)
+- [Instalasi](#instalasi)
+- [Commands yang Tersedia](#commands-yang-tersedia)
+- [Serialisasi Pesan](#serialisasi-pesan)
+- [Screenshots](#screenshots)
 
 ## Deskripsi Singkat
 
@@ -74,6 +86,30 @@ SQLite database `fake_dc.db` akan dibuat secara otomatis saat server pertama kal
 
 <img width="601" height="181" alt="letschatarchi" src="https://github.com/user-attachments/assets/01c35997-bc0a-41d1-a0d0-1f5034d7d4e0" />
 
+## Enskripsi TLS
+
+Aplikasi ini menggunakan TLS (Transport Layer Security) untuk mengenkripsi komunikasi antara client dan server.
+
+Server menggunakan SSL context:
+```
+context = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
+context.load_cert_chain(certfile="server.crt", keyfile="server.key")
+```
+
+Client menggunakan secure socket:
+```
+context = ssl.create_default_context()
+context.check_hostname = False
+context.verify_mode = ssl.CERT_NONE
+sock = context.wrap_socket(sock, server_hostname=HOST)
+```
+
+Fungsi TLS dalam aplikasi ini:
+- Mengenkripsi seluruh komunikasi TCP
+- Mencegah packet sniffing (data tidak bisa dibaca saat ditangkap)
+- Melindungi login credentials (username & password)
+- Mengamankan file transfer dan chat messages
+
 ## Akun Default
 
 Aplikasi tidak menyediakan fitur registrasi akun. Seluruh akun disimpan secara manual pada database SQLite.
@@ -94,6 +130,22 @@ Pastikan python sudah terinstalasi:
 ```
 python --version
 ```
+Generate sertifikasi SSL:
+```
+openssl req -x509 -newkey rsa:2048 -keyout server.key -out server.crt -days 365 -nodes
+```
+Saat diminta input:
+- Country / State / etc → bebas (boleh ENTER saja)
+
+File yang dihasilkan:
+- server.key (private key)
+- server.crt (certificate)
+
+Letakkan file ini di root project, karena server akan memanggil:
+```
+context.load_cert_chain(certfile="server.crt", keyfile="server.key")
+```
+
 ### Menjalankan server
 
 Mulai server:
@@ -103,7 +155,7 @@ python server/server.py
 
 Ouput:
 ```
-[DB] Database & Tabel berhasil diinisialisasi.
+[DB] Database initialized.
 [LISTENING] 0.0.0.0:5000
 ```
 
@@ -132,7 +184,7 @@ Login menggunakan salah satu akun pada [Akun Default](#akun-default).
 | /create <room>        | Membuat room baru                                     |  
 | /join <room>          | Bergabung ke room tertentu                            |
 | /history <jumlah>     | Menampilkan sejumlah pesan terakhir dari room aktif   |
-| /file                 | Mengirim File                                         |
+| /file <file path>     | Mengirim File                                         |
 | /dm <user> <message>  | Mengirim private message                              |
 | /bc <message>         | Mengirim broadcast message ke seluruh pengguna online |
 | /logout               | Keluar dari aplikasi                                  |

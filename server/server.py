@@ -3,6 +3,7 @@ import threading
 import json
 from datetime import datetime
 import database
+import ssl
 
 HOST = "0.0.0.0"
 PORT = 5000
@@ -19,7 +20,7 @@ lock = threading.Lock()
 def send(sock, data):
 
     try:
-        sock.send(json.dumps(data).encode())
+        sock.send((json.dumps(data) + "\n").encode())
     except:
         pass
 
@@ -107,6 +108,17 @@ def handle_message(data):
 
     for user in targets:
         send(clients[user]["sock"], payload)
+
+
+def handle_broadcast_room(room, payload):
+    with lock:
+        targets = list(rooms.get(room, set()))
+
+    for user in targets:
+        try:
+            send(clients[user]["sock"], payload)
+        except:
+            pass 
 
 
 def handle_logout(username):
@@ -209,7 +221,6 @@ def handle_broadcast(data, username):
     print(f"[BC] {username}: {message}")
 
     database.log_message(msg_type="broadcast", sender=username, message=message, room="ALL")
-
     
 
 def handle_create_room(data, username):
@@ -225,17 +236,6 @@ def handle_create_room(data, username):
     send_system(username, f"{room} room created")
 
     print(f"[ROOM CREATED] {room}")
-
-
-def handle_broadcast_room(room, payload):
-    with lock:
-        targets = list(rooms.get(room, set()))
-
-    for user in targets:
-        try:
-            send(clients[user]["sock"], payload)
-        except:
-            pass 
 
 
 def handle_join_room(data, username):
@@ -267,6 +267,7 @@ def handle_join_room(data, username):
     send_system(username, f"Joined {new_room} room")
 
     print(f"[ROOM] {username}: Moved from {old_room} room to {new_room} room")
+
 
 def handle_history(data, username):
     limit = data["limit"]
@@ -306,6 +307,7 @@ def handle_history(data, username):
     finally:
         conn.close()
 
+
 def handle_file(data):
     sender = data["sender"]
     filename = data["filename"]
@@ -336,10 +338,13 @@ def handle_file(data):
     for user in rooms.get(room, []):
         send(clients[user]["sock"], payload)
 
+
 def handle_client(conn, addr):
     print(f"[CONNECTED] {addr}")
 
     username = None
+
+    buffer = ""
 
     while True:
         try:
@@ -349,53 +354,61 @@ def handle_client(conn, addr):
                 print(f"[EMPTY] {addr}")
                 break
 
-            try: 
-                msg = json.loads(data.decode())
+            buffer += data.decode()
 
-            except json.JSONDecodeError:
-                print(f"[BAD JSON] {addr}")
-                continue    
+            while "\n" in buffer:
+                line, buffer = buffer.split("\n", 1)
 
-            if msg["type"] == "LOGIN":
-                username = handle_login(msg, conn)
+                if not line.strip():
+                    continue
 
-                if username == None:
-                    print("[LOGIN FAILED]")
-                    break
+                try: 
+                    msg = json.loads(line)
 
-            elif msg["type"] == "MESSAGE":
-                if username:
-                    handle_message(msg)
+                except json.JSONDecodeError:
+                    print(f"[BAD JSON] {addr}")
+                    continue    
 
-            elif msg["type"] == "CREATE_ROOM":
-                handle_create_room(msg, username)
+                if msg["type"] == "LOGIN":
+                    username = handle_login(msg, conn)
 
-            elif msg["type"] == "JOIN_ROOM":
-                handle_join_room(msg, username)
+                    if username == None:
+                        print("[LOGIN FAILED]")
+                        break
 
-            elif msg["type"] == "USERS":
-                handle_users(username)
-
-            elif msg["type"] == "ROOMS":
-                handle_rooms(username)
-
-            elif msg["type"] == "DM":
-                handle_dm(msg, username)
-
-            elif msg["type"] == "BC":
-                handle_broadcast(msg, username)
-
-            elif msg["type"] == "HISTORY":
-                if username:
-                    handle_history(msg, username)
-
-            elif msg["type"] == "FILE":
+                elif msg["type"] == "MESSAGE":
                     if username:
-                        handle_file(msg)
+                        handle_message(msg)
 
-            elif msg["type"] == "LOGOUT":
-                handle_logout(username)
-                break
+                elif msg["type"] == "CREATE_ROOM":
+                    handle_create_room(msg, username)
+
+                elif msg["type"] == "JOIN_ROOM":
+                    handle_join_room(msg, username)
+
+                elif msg["type"] == "USERS":
+                    handle_users(username)
+
+                elif msg["type"] == "ROOMS":
+                    handle_rooms(username)
+
+                elif msg["type"] == "DM":
+                    handle_dm(msg, username)
+
+                elif msg["type"] == "BC":
+                    handle_broadcast(msg, username)
+
+                elif msg["type"] == "HISTORY":
+                    if username:
+                        handle_history(msg, username)
+
+                elif msg["type"] == "FILE":
+                        if username:
+                            handle_file(msg)
+
+                elif msg["type"] == "LOGOUT":
+                    handle_logout(username)
+                    break
 
         except Exception as e:
             print(f"[ERROR] {addr} -> {e}")
@@ -407,6 +420,12 @@ def handle_client(conn, addr):
 
 def start_server():
 
+    context = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
+    context.load_cert_chain(
+        certfile="server.crt",
+        keyfile="server.key"
+    )
+
     server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     server.bind((HOST, PORT))
     server.listen()
@@ -416,6 +435,11 @@ def start_server():
     while True:
 
         conn, addr = server.accept()
+
+        conn = context.wrap_socket(
+            conn,
+            server_side=True 
+        )
 
         thread = threading.Thread(target=handle_client, args=(conn, addr), daemon=True)
 

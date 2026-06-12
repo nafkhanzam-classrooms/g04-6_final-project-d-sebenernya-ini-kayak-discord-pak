@@ -1,2 +1,4 @@
-server\__pycache__
+server/__pycache__
 fake_dc.db
+*.key
+*.crt

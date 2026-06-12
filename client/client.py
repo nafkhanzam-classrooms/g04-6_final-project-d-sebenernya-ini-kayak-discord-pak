@@ -3,12 +3,15 @@ import threading
 import os
 import base64
 import json
+import ssl
 
 HOST = "127.0.0.1"
 PORT = 5000
 
 
 def receive(sock):
+
+    buffer = ""
 
     while True:
 
@@ -18,59 +21,80 @@ def receive(sock):
             if not data:
                 break
 
-            msg = json.loads(data.decode())
+            buffer += data.decode()
 
-            if msg["type"] == "MESSAGE":
-                print(f'\n[{msg["timestamp"]}] {msg["sender"]}: {msg["message"]}')
-                print("> ", end="", flush=True)
+            while "\n" in buffer:
+                line, buffer = buffer.split("\n", 1)
+                 
+                if not line.strip():
+                    continue
 
-            elif msg["type"] == "SYSTEM":
-                print(f"\n[SYSTEM] {msg['message']}")
-                print("> ", end="", flush=True)
+                msg = json.loads(line)
 
-            elif msg["type"] == "HISTORY_RESPONSE":
-                print("\n--- CHAT HISTORY ---")
-                for chat in msg["chats"]:
-                    print(f"[{chat['timestamp']}] {chat['sender']}: {chat['message']}")
-                print("--------------------")
-                print("> ", end="", flush=True)
+                if msg["type"] == "MESSAGE":
+                    print(f'\n[{msg["timestamp"]}] {msg["sender"]}: {msg["message"]}')
+                    print("> ", end="", flush=True)
 
-            elif msg["type"] == "FILE":
-                filename = msg["filename"]
-                file_data_b64 = msg["file_data"]
-                sender = msg["sender"]
+                elif msg["type"] == "SYSTEM":
+                    print(f"\n[SYSTEM] {msg['message']}")
+                    print("> ", end="", flush=True)
 
-                if not os.path.exists("downloads"):
-                    os.makedirs("downloads")
+                elif msg["type"] == "HISTORY_RESPONSE":
+                    print("\n--- CHAT HISTORY ---")
+                    for chat in msg["chats"]:
+                        print(f"[{chat['timestamp']}] {chat['sender']}: {chat['message']}")
+                    print("--------------------")
+                    print("> ", end="", flush=True)
 
-                filepath = os.path.join("downloads", filename)
+                elif msg["type"] == "FILE":
+                    filename = msg["filename"]
+                    file_data_b64 = msg["file_data"]
+                    sender = msg["sender"]
 
-                with open(filepath, "wb") as f:
-                    f.write(base64.b64decode(file_data_b64.encode()))
+                    if not os.path.exists("downloads"):
+                        os.makedirs("downloads")
 
-                print(
-                    f"\n[{msg['timestamp']}] [FILE] {sender} sending: '{filename}'"
-                )
-                print(f"[SYSTEM] File received: {filepath}")
-                print("> ", end="", flush=True)
+                    filepath = os.path.join("downloads", filename)
+
+                    with open(filepath, "wb") as f:
+                        f.write(base64.b64decode(file_data_b64.encode()))
+
+                    print(
+                        f"\n[{msg['timestamp']}] [FILE] {sender} sending: '{filename}'"
+                    )
+                    print(f"[SYSTEM] File received: {filepath}")
+                    print("> ", end="", flush=True)
 
         except:
             break
 
+def send(sock, payload):
+    sock.send((json.dumps(payload) + "\n").encode())
 
 def start_client():
 
+    context = ssl.create_default_context()
+
+    context.check_hostname = False
+    context.verify_mode = ssl.CERT_NONE
+
     sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+
+    sock = context.wrap_socket(
+        sock,
+        server_hostname=HOST
+    )
+
     sock.connect((HOST, PORT))
 
     username = input("Username: ")
     password = input("Password: ")
 
-    sock.send(json.dumps({
+    send(sock, {
         "type": "LOGIN",
         "sender": username,
         "password": password
-    }).encode())
+    })
 
     data = sock.recv(4096)
     msg = json.loads(data.decode())
@@ -107,67 +131,67 @@ def start_client():
             continue
 
         if msg in ["/exit", "/logout"]:
-            sock.send(json.dumps({
+            send(sock, {
                 "type": "LOGOUT",
                 "sender": username
-            }).encode())
+            })
 
             sock.close()
             print("[SYSTEM] Disconnected from server")
             break
 
         if msg == "/users":
-            sock.send(json.dumps({
+            send(sock, {
                 "type": "USERS",
                 "sender": username
-            }).encode())
+            })
             continue
 
 
         if msg == "/rooms":
-            sock.send(json.dumps({
+            send(sock, {
                 "type": "ROOMS",
                 "sender": username
-            }).encode())
+            })
             continue
 
 
         if msg.startswith("/dm "):
-            sock.send(json.dumps({
+            send(sock,{
                 "type": "DM",
                 "sender": username,
                 "message": msg
-            }).encode())
+            })
             continue
 
 
         if msg.startswith("/bc "):
-            sock.send(json.dumps({
+            send(sock, {
                 "type": "BC",
                 "sender": username,
                 "message": msg
-            }).encode())
+            })
             continue
 
         if msg.startswith("/create "):
             room = msg.split(" ", 1)[1]
 
-            sock.send(json.dumps({
+            send(sock, {
                 "type": "CREATE_ROOM",
                 "sender": username,
                 "room": room
-            }).encode())
+            })
             continue
 
         if msg.startswith("/history "):
             try:
                 limit = int(msg.split(" ", 1)[1].strip())
                 
-                sock.send(json.dumps({
+                send(sock, {
                     "type": "HISTORY",
                     "sender": username,
                     "limit": limit
-                }).encode())
+                })
             except ValueError:
                 print("[SYSTEM] Failed!")
             continue
@@ -204,21 +228,21 @@ def start_client():
         if msg.startswith("/join "):
             room = msg.split(" ", 1)[1]
 
-            sock.send(json.dumps({
+            send(sock, {
                 "type": "JOIN_ROOM",
                 "sender": username,
                 "room": room
-            }).encode())
+            })
             continue
 
-        sock.send(json.dumps({
+        send(sock, {
             "type": "MESSAGE",
             "sender": username,
             "message": msg,
             "room": "",
             "timestamp": ""
 
-        }).encode())
+        })
 
 
 

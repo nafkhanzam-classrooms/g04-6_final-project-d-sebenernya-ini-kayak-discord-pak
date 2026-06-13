@@ -11,7 +11,7 @@
 ## Video Demo
 
 ```
-(https://youtu.be/aiQi-zqvHlc)
+https://youtu.be/aiQi-zqvHlc
 ```
 ## Daftar Isi
 
